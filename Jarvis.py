@@ -2,7 +2,7 @@
 # Check out the calendar functionalities
 # Bring in NLP upgrades
 # Check out the get date module from tech with tim and update the add event and delete event
-# functions
+# Bring in OpenCV gender detection
 
 import datetime
 import webbrowser
