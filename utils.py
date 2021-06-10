@@ -224,15 +224,5 @@ def remove_event(title):
 # there might be a potential clash with the event summary and phrase-key. Better to call get time
 # seperately
 
-phrase = ['in', 'after', 'from']
-# def get_time(text):
-#     text = text.lower()
-#     now = datetime.datetime.now()
-#
-#     if text.count("now") > 0:
-#         return now
-
-    # for i in text:
-    #     if i in phrase:
 
 
