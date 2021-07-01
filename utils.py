@@ -1,15 +1,22 @@
 from __future__ import print_function
 import os.path
 import pickle
-import pytz
+import pyttsx3
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
-import datetime
 import os
-import subprocess
+import playsound
 from gtts import gTTS
+import datetime
+import pytz
+import spacy
+import re
 
+time_frames = ['hour', 'minute', 'day', 'tomorrow']
+
+UTC = pytz.utc
+IST = pytz.timezone('Asia/Kolkata')
 MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november",
           "december"]
 
@@ -17,14 +24,19 @@ DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sun
 
 DAY_EXTENTIONS = ["rd", "th", "st", "nd"]
 
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
 
-def speak(audioString):
-    print(audioString)
-    tts = gTTS(text=audioString, lang='en', tld='co.za')
-    tts.save("audio_main.mp3")
-    os.system("mpg123 audio_main.mp3")
+# def speak(audioString):
+#     print(audioString)
+#     tts = gTTS(text=audioString, lang='en', tld='co.za')
+#
+#     # os.system("audio_main.mp3")
+
+def speak(text):
+    engine = pyttsx3.init()
+    engine.say(text)
+    engine.runAndWait()
 
 
 def authenticate_google():
@@ -41,7 +53,7 @@ def authenticate_google():
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                '/home/babayaga/PycharmProjects/Jarvis/creds.json', SCOPES)
+                'creds.json', SCOPES)
             creds = flow.run_local_server(port=0)
 
         with open('token.pickle', 'wb') as token:
@@ -95,6 +107,8 @@ def get_date(text):
 
     if text.count("today") > 0:
         return today
+    if text == 'tomorrow':
+        return datetime.datetime.now(IST) + datetime.timedelta(days=1)
 
     day = -1
     day_of_week = -1
@@ -190,8 +204,41 @@ def read_note():
     file = open('memo.txt', 'r')
     speak(file.read())
 
-def add_event(title, start_time, end_time=None):
-    # This function is under developement. To be able to execute this properly I'll have
+
+def get_time(command):
+    nlp = spacy.load('en_core_web_sm')
+    text = nlp(command)
+    for ent in text.ents:
+        if ent.label_ == 'TIME' or 'DATE':
+            time_information = ent.text
+            # print(time_information)
+    time_information = [0,0]
+    for i in time_frames:
+        if i in time_information:
+            try:
+                scale = int(re.search(r'\d+', time_information).group())
+            except AttributeError:
+                scale = (re.search(r'\d+', time_information))
+            # print(i, scale, '\n', datetime.datetime.now(IST))
+            if i == 'hour':
+                effective_time = datetime.datetime.now(IST) + datetime.timedelta(hours=scale)
+            elif i == 'minute':
+                effective_time = datetime.datetime.now(IST) + datetime.timedelta(minutes=scale)
+            elif i == 'tomorrow':
+                effective_time = datetime.datetime.now(IST) + datetime.timedelta(days=1)
+            else:
+                effective_time = datetime.datetime.now(IST) + datetime.timedelta(days=scale)
+
+            effective_time = str(effective_time)
+            effective_time: str = effective_time[:10]+ 'T0' + effective_time[12:22]
+
+            return effective_time
+        else: effective_time = 0
+
+    return effective_time
+
+def add_event(description, start_time, end_time=None):
+    # This function is under development. To be able to execute this properly I'll have
     # to figure out a way to extract time information from the input and convert that into
     # google calendar's format.
     # 2012-07-11T03:30:00-06:00 : Required Format
@@ -199,10 +246,11 @@ def add_event(title, start_time, end_time=None):
         end_time = start_time
     service = authenticate_google()
     event = {
-        'summary': title,
+        'summary': 'Reminder',
         'start': {
             'dateTime': start_time,
             'timeZone': 'Asia/Kolkata',
+            'description': description,
         },
         'end': {
             'dateTime': end_time,
@@ -212,17 +260,38 @@ def add_event(title, start_time, end_time=None):
     print(start_time, end_time)
     event = service.events().insert(calendarId='primary', body=event).execute()
     print('Event created: %s' % (event.get('htmlLink')))
+    speak('Task Succesful sir.')
 
-def remove_event(title):
-    service = authenticate_google()
-    event = {'summary' : title}
-    service.events().delete(calendarId='primary', eventId='eventId').execute()
-    print('Event deleted: %s' % (event.get('htmlLink')))
+def get_weather():
+    import requests, json
 
-# add_event('Take GRE exam', start_time='2021-07-11T03:30:00-06:00')
+    # Enter your API key here
+    api_key = "3c66fcd4dd5aceefe2cc38e0ec1d51ee"
 
-# there might be a potential clash with the event summary and phrase-key. Better to call get time
-# seperately
+    # base_url variable to store url
+    base_url = "http://api.openweathermap.org/data/2.5/weather?"
 
+    # Give city name
+    city_name = 'Nellore'
 
+    complete_url = base_url + "q=" + city_name + "&appid=" + api_key
+    response = requests.get(complete_url)
+
+    x = response.json()
+
+    if x["cod"] != "404":
+        y = x["main"]
+        current_temperature = int(y["temp"]) - 273
+        current_pressure = y["pressure"]
+        current_humidity = y["humidity"]
+        z = x["weather"]
+        weather_description = z[0]["description"]
+        print(" The Temperature: " +
+              str(current_temperature) + ' Degrees Celsius.'
+              "\n description = " +
+              str(weather_description))
+        speak(" The Weather in Nellure is " +
+              str(current_temperature) + ' Degrees Celsius.'
+              "\n  and is expected to be " +
+              str(weather_description))
 

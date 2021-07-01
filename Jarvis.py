@@ -1,12 +1,10 @@
-# Add abort feature
-# Check out the calendar functionalities
-# Bring in NLP upgrades
-# Check out the get date module from tech with tim and update the add event and delete event
-# Bring in OpenCV gender detection
+# Add common Abort statements globally
+# Bring in the morning briefing
+
 
 import datetime
 import webbrowser
-from utils import get_events, get_date, speak, get_all_events, note, read_note
+from utils import get_events, get_date, speak, get_all_events, note, read_note, get_time, add_event, get_weather
 from random import randint
 import pywhatkit
 from googlesearch import search
@@ -14,9 +12,9 @@ import speech_recognition as sr
 
 intro = ['Hello. I am Jarvis. Yashwanths Personal Assistant.']
 
-wish = ['hi', 'hey', 'whats up']
+wish = ['hi', 'hey', 'whats up', 'are you there']
 
-wish_reply = ['Hello sir. How may I be of service',
+wish_reply = [ 'As always sir',
               'I am at your disposal sir.']
 
 greetings = ['Hello sir.', 'Good to see you sir.', 'I am glad you are back sir.', 'Been a while Sir.']
@@ -38,7 +36,7 @@ functions = ['I can currently,', 'do a websearch, ', 'keep track of your upcomin
              'take a quick note..', 'many more under developement.']
 
 r = sr.Recognizer()
-r.energy_threshold = 11470.226149936585  # 2435.247887648958   # 1920.5755112995746
+# r.energy_threshold = 11470.226149936585  # 2435.247887648958   # 1920.5755112995746
 r.pause_threshold = 0.8
 
 speak(intro[0])
@@ -48,6 +46,7 @@ trigger = 'jarvis'
 def take_command():
     with sr.Microphone() as source:
         print("Listening...")
+        r.adjust_for_ambient_noise(source)
         audio = r.listen(source)
     try:
         print("Recognizing...")
@@ -60,14 +59,16 @@ def take_command():
     return query
 
 
-def run_jarvis():
-    speak('I am listening sir.')
-    command = take_command()
+def run_jarvis(*args):
+    if args == ():
+        command = take_command()
+    else:
+        command = args(1)
     print('Task Ready...')
     fail = 1
     for i in wish:
         if i in command:
-            speak(greetings[randint(0,len(greetings)-1)])
+            speak(greetings[randint(0, len(greetings)-1)])
             fail = 0
             break
     if fail:
@@ -98,12 +99,27 @@ def run_jarvis():
                 if 'positive' in cont or 'correct' in cont:
                     print(cont)
                     flag = 1
-                else: flag = 0
+                else:
+                    flag = 0
             else:
-                speak('let me try another time, sir')
+                speak('I beg your pardon sir')
     elif 'read' in command:
         read_note()
         fail = 0
+    elif 'quit' in command:
+        return 0
+    elif 'remind' in command or 'add' in command:
+        inp = command
+        while True:
+            if get_time(inp):
+                add_event(description=inp, start_time=get_time(inp))
+                fail = 0
+                break
+            else:
+                speak('Please provide a time window sir')
+                inp = take_command()
+            if 'quit' in command:
+                break
     else:
         for phrase in CALENDAR_STRS:
             if phrase not in command:
@@ -126,7 +142,7 @@ def run_jarvis():
             # print(i,fail)
             if i in command and fail:
                 print('here')
-                url = (search(command, num=1, stop=1))
+                url = (search(command, num_results=1))
                 for j in url:
                     fail = 0
                     link = j
@@ -134,18 +150,20 @@ def run_jarvis():
 
     if fail:
         speak(task_fails[randint(0, len(task_fails) - 1)])
-    speak('is there anything else you want me to do sir?')
-    status_input = take_command()
-    if ('positive' in status_input) or ('yes' in status_input):
-        status = 1
-    else:
-        status = 0
-    return status
+    return 1
 
 
+
+
+if (int(datetime.datetime.now().hour) >= 4) and (int(datetime.datetime.now().hour) < 12):
+    speak('Good Morning sir')
+    get_weather()
+    get_events(get_date('today'))
 while True:
     command = take_command()
     if trigger in command:
+        speak('At your service sir.')
         while True:
             status = run_jarvis()
-            if not status: break
+            if not status:
+                break
